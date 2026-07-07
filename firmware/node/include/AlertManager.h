@@ -22,7 +22,7 @@ private:
 
     SalineStatus _currentAlert;
 
-    unsigned long _lastBlink;
+    unsigned long _lastBlinkTime;
 
     bool _ledState;
 

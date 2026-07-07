@@ -1,15 +1,24 @@
 #include "AlertManager.h"
 
+/*
+============================================================
+Constructor
+============================================================
+*/
+
 AlertManager::AlertManager(uint8_t ledPin)
+    : _ledPin(ledPin),
+      _currentAlert(SalineStatus::UNKNOWN),
+      _lastBlinkTime(0),
+      _ledState(false)
 {
-    _ledPin = ledPin;
-
-    _currentAlert = SalineStatus::UNKNOWN;
-
-    _lastBlink = 0;
-
-    _ledState = false;
 }
+
+/*
+============================================================
+Initialize Alert Manager
+============================================================
+*/
 
 bool AlertManager::begin()
 {
@@ -19,6 +28,12 @@ bool AlertManager::begin()
 
     return true;
 }
+
+/*
+============================================================
+Update Alert State
+============================================================
+*/
 
 void AlertManager::update(SalineStatus status)
 {
@@ -60,53 +75,107 @@ void AlertManager::update(SalineStatus status)
     }
 }
 
+/*
+============================================================
+Current Alert
+============================================================
+*/
+
 SalineStatus AlertManager::getCurrentAlert() const
 {
     return _currentAlert;
 }
+
+/*
+============================================================
+Normal
+============================================================
+*/
 
 void AlertManager::normal()
 {
     digitalWrite(_ledPin, HIGH);
 }
 
+/*
+============================================================
+Low Saline
+============================================================
+*/
+
 void AlertManager::lowSaline()
 {
     blink(1000);
 }
+
+/*
+============================================================
+Empty Bottle
+============================================================
+*/
 
 void AlertManager::emptyBottle()
 {
     blink(300);
 }
 
+/*
+============================================================
+Bottle Removed
+============================================================
+*/
+
 void AlertManager::bottleRemoved()
 {
     blink(150);
 }
+
+/*
+============================================================
+No Drip
+============================================================
+*/
 
 void AlertManager::noDrip()
 {
     blink(700);
 }
 
+/*
+============================================================
+Tube Blocked
+============================================================
+*/
+
 void AlertManager::tubeBlocked()
 {
     blink(500);
 }
+
+/*
+============================================================
+Sensor Failure
+============================================================
+*/
 
 void AlertManager::sensorFailure()
 {
     blink(100);
 }
 
+/*
+============================================================
+Generic Blink Function
+============================================================
+*/
+
 void AlertManager::blink(uint16_t interval)
 {
-    unsigned long now = millis();
+    unsigned long currentTime = millis();
 
-    if (now - _lastBlink >= interval)
+    if (currentTime - _lastBlinkTime >= interval)
     {
-        _lastBlink = now;
+        _lastBlinkTime = currentTime;
 
         _ledState = !_ledState;
 

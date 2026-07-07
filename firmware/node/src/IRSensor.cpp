@@ -1,5 +1,11 @@
 #include "IRSensor.h"
 
+/*
+============================================================
+Constructor
+============================================================
+*/
+
 IRSensor::IRSensor(uint8_t pin)
     : _pin(pin),
       _lastState(HIGH),
@@ -11,6 +17,12 @@ IRSensor::IRSensor(uint8_t pin)
       _windowCount(0)
 {
 }
+
+/*
+============================================================
+Initialize IR Sensor
+============================================================
+*/
 
 bool IRSensor::begin()
 {
@@ -27,6 +39,15 @@ bool IRSensor::begin()
     return true;
 }
 
+/*
+============================================================
+Update Sensor State
+
+Detects falling edge:
+HIGH -> LOW
+============================================================
+*/
+
 void IRSensor::update()
 {
     _dripEvent = false;
@@ -35,10 +56,9 @@ void IRSensor::update()
 
     unsigned long now = millis();
 
-    // Detect falling edge (HIGH -> LOW)
-    if (_lastState == HIGH && currentState == LOW)
+    if (_lastState == HIGH &&
+        currentState == LOW)
     {
-        // Debounce filtering
         if ((now - _lastPulseTime) >= DEBOUNCE_MS)
         {
             _dripCount++;
@@ -54,15 +74,36 @@ void IRSensor::update()
     _lastState = currentState;
 }
 
+/*
+============================================================
+Returns true only once per detected drip
+============================================================
+*/
+
 bool IRSensor::dripDetected()
 {
     return _dripEvent;
 }
 
+/*
+============================================================
+Total Drip Counter
+============================================================
+*/
+
 uint32_t IRSensor::getDripCount() const
 {
     return _dripCount;
 }
+
+/*
+============================================================
+Flow Rate
+
+Returns:
+Drops / Minute
+============================================================
+*/
 
 float IRSensor::getFlowRate()
 {
@@ -75,11 +116,12 @@ float IRSensor::getFlowRate()
         return 0.0f;
     }
 
-    float elapsedMinutes = elapsed / 60000.0f;
+    float elapsedMinutes =
+        elapsed / 60000.0f;
 
-    float flowRate = _windowCount / elapsedMinutes;
+    float flowRate =
+        _windowCount / elapsedMinutes;
 
-    // Reset calculation window every minute
     if (elapsed >= FLOW_WINDOW_MS)
     {
         _windowStart = now;
@@ -89,28 +131,52 @@ float IRSensor::getFlowRate()
     return flowRate;
 }
 
+/*
+============================================================
+Returns true when no drip
+has been detected for 10 seconds.
+============================================================
+*/
+
 bool IRSensor::noDrip()
 {
-    return (millis() - _lastDripTime) >= NO_DRIP_TIMEOUT_MS;
+    return (millis() - _lastDripTime) >=
+            NO_DRIP_TIMEOUT_MS;
 }
+
+/*
+============================================================
+Basic Sensor Health Check
+============================================================
+*/
 
 bool IRSensor::sensorHealthy()
 {
     int state = digitalRead(_pin);
 
-    return (state == HIGH || state == LOW);
+    return (state == HIGH ||
+            state == LOW);
 }
+
+/*
+============================================================
+Reset Counters
+============================================================
+*/
 
 void IRSensor::resetCounter()
 {
     _dripCount = 0;
+
     _windowCount = 0;
 
     unsigned long now = millis();
 
     _windowStart = now;
-    _lastDripTime = now;
+
     _lastPulseTime = now;
+
+    _lastDripTime = now;
 
     _dripEvent = false;
 }

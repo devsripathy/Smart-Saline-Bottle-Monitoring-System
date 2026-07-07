@@ -6,6 +6,7 @@
 class LoRaManager
 {
 public:
+
     LoRaManager(
         long frequency,
         uint8_t ssPin,
@@ -20,20 +21,21 @@ public:
         float percentage,
         uint32_t dripCount,
         float flowRate,
-        const String& status);
+        const char* status);
 
     bool available();
 
     String receivePacket();
 
 private:
+
     long _frequency;
 
     uint8_t _ssPin;
     uint8_t _rstPin;
     uint8_t _dio0Pin;
 
-    uint16_t _packetCounter;
+    uint16_t _sequenceNumber;
 
     String createPacket(
         const String& deviceId,
@@ -41,7 +43,7 @@ private:
         float percentage,
         uint32_t dripCount,
         float flowRate,
-        const String& status);
+        const char* status);
 
     bool waitForAck(uint32_t timeout);
 };

@@ -1,63 +1,193 @@
-#ifndef HX711_SENSOR_H
-#define HX711_SENSOR_H
+#include "HX711Sensor.h"
 
-#include <Arduino.h>
-#include <HX711.h>
-
-class HX711Sensor
+HX711Sensor::HX711Sensor(
+    uint8_t doutPin,
+    uint8_t sckPin,
+    float calibrationFactor,
+    float emptyWeight,
+    float fullWeight)
+    : _doutPin(doutPin),
+      _sckPin(sckPin),
+      _calibrationFactor(calibrationFactor),
+      _emptyWeight(emptyWeight),
+      _fullWeight(fullWeight),
+      index(0),
+      filled(false)
 {
-public:
-    HX711Sensor(
-        uint8_t doutPin,
-        uint8_t sckPin,
-        float calibrationFactor,
-        float emptyWeight,
-        float fullWeight);
+    for (uint8_t i = 0; i < FILTER_SIZE; i++)
+    {
+        samples[i] = 0.0f;
+    }
+}
 
-    bool begin();
+bool HX711Sensor::begin()
+{
+    scale.begin(_doutPin, _sckPin);
 
-    float getWeight();
+    delay(500);
 
-    float getFilteredWeight();
+    if (!scale.is_ready())
+    {
+        return false;
+    }
 
-    float getPercentage();
+    scale.set_scale(_calibrationFactor);
 
-    bool bottlePresent();
+    tare();
 
-    bool isBottleEmpty();
+    return true;
+}
 
-    bool isBottleLow();
+void HX711Sensor::tare()
+{
+    if (scale.is_ready())
+    {
+        scale.tare();
+    }
+}
 
-    bool sensorHealthy();
+void HX711Sensor::setCalibrationFactor(float factor)
+{
+    _calibrationFactor = factor;
+    scale.set_scale(_calibrationFactor);
+}
 
-    void tare();
+float HX711Sensor::getCalibrationFactor() const
+{
+    return _calibrationFactor;
+}
 
-    void setCalibrationFactor(float factor);
+bool HX711Sensor::sensorHealthy()
+{
+    return scale.is_ready();
+}
 
-    float getCalibrationFactor() const;
+float HX711Sensor::getWeight()
+{
+    if (!sensorHealthy())
+    {
+        return -1.0f;
+    }
 
-private:
-    HX711 scale;
+    return scale.get_units(10);
+}
 
-    uint8_t _doutPin;
-    uint8_t _sckPin;
+float HX711Sensor::applyMovingAverage(float value)
+{
+    samples[index] = value;
 
-    float _calibrationFactor;
+    index++;
 
-    float _emptyWeight;
-    float _fullWeight;
+    if (index >= FILTER_SIZE)
+    {
+        index = 0;
+        filled = true;
+    }
 
-    static const uint8_t FILTER_SIZE = 10;
+    uint8_t count = filled ? FILTER_SIZE : index;
 
-    float samples[FILTER_SIZE];
+    if (count == 0)
+    {
+        return value;
+    }
 
-    uint8_t index;
+    float sum = 0.0f;
 
-    bool filled;
+    for (uint8_t i = 0; i < count; i++)
+    {
+        sum += samples[i];
+    }
 
-    float applyMovingAverage(float value);
+    return sum / static_cast<float>(count);
+}
 
-    float constrainPercentage(float percent);
-};
+float HX711Sensor::getFilteredWeight()
+{
+    float weight = getWeight();
 
-#endif
+    if (weight < 0.0f)
+    {
+        return weight;
+    }
+
+    return applyMovingAverage(weight);
+}
+
+float HX711Sensor::constrainPercentage(float percent)
+{
+    if (percent < 0.0f)
+    {
+        return 0.0f;
+    }
+
+    if (percent > 100.0f)
+    {
+        return 100.0f;
+    }
+
+    return percent;
+}
+
+float HX711Sensor::getPercentage()
+{
+    float weight = getFilteredWeight();
+
+    if (weight < 0.0f)
+    {
+        return 0.0f;
+    }
+
+    float usableWeight = _fullWeight - _emptyWeight;
+
+    if (usableWeight <= 0.0f)
+    {
+        return 0.0f;
+    }
+
+    float percentage =
+        ((weight - _emptyWeight) / usableWeight) * 100.0f;
+
+    return constrainPercentage(percentage);
+}
+
+bool HX711Sensor::bottlePresent()
+{
+    constexpr float PRESENT_THRESHOLD = 50.0f;
+
+    float weight = getFilteredWeight();
+
+    if (weight < 0.0f)
+    {
+        return false;
+    }
+
+    return weight >= PRESENT_THRESHOLD;
+}
+
+bool HX711Sensor::isBottleEmpty()
+{
+    constexpr float EMPTY_THRESHOLD = 5.0f;
+
+    if (!bottlePresent())
+    {
+        return false;
+    }
+
+    return getPercentage() <= EMPTY_THRESHOLD;
+}
+
+bool HX711Sensor::isBottleLow()
+{
+    constexpr float LOW_THRESHOLD = 20.0f;
+    constexpr float EMPTY_THRESHOLD = 5.0f;
+
+    if (!bottlePresent())
+    {
+        return false;
+    }
+
+    float percentage = getPercentage();
+
+    return (percentage > EMPTY_THRESHOLD) &&
+           (percentage <= LOW_THRESHOLD);
+}

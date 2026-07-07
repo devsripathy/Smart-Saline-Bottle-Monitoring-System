@@ -1,0 +1,54 @@
+name: Build
+
+on:
+
+  push:
+
+    branches:
+      - main
+
+  pull_request:
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+
+        uses: actions/setup-dotnet@v4
+
+        with:
+
+          dotnet-version: 8.0.x
+
+      - name: Build Backend
+
+        run: |
+          cd backend
+          dotnet build
+
+      - name: Setup Node
+
+        uses: actions/setup-node@v4
+
+        with:
+
+          node-version: 20
+
+      - name: Install Dashboard
+
+        run: |
+          cd dashboard
+          npm install
+
+      - name: Build Dashboard
+
+        run: |
+          cd dashboard
+          npm run build

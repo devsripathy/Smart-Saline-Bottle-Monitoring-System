@@ -1,4 +1,11 @@
 #include "HX711Sensor.h"
+#include "Config.h"
+
+/*
+============================================================
+Constructor
+============================================================
+*/
 
 HX711Sensor::HX711Sensor(
     uint8_t doutPin,
@@ -6,97 +13,141 @@ HX711Sensor::HX711Sensor(
     float calibrationFactor,
     float emptyWeight,
     float fullWeight)
+    : _doutPin(doutPin),
+      _sckPin(sckPin),
+      _calibrationFactor(calibrationFactor),
+      _emptyWeight(emptyWeight),
+      _fullWeight(fullWeight),
+      _sampleIndex(0),
+      _bufferFilled(false)
 {
-    _doutPin = doutPin;
-    _sckPin = sckPin;
-
-    _calibrationFactor = calibrationFactor;
-
-    _emptyWeight = emptyWeight;
-    _fullWeight = fullWeight;
-
-    index = 0;
-    filled = false;
-
     for (uint8_t i = 0; i < FILTER_SIZE; i++)
     {
-        samples[i] = 0.0f;
+        _samples[i] = 0.0f;
     }
 }
+
+/*
+============================================================
+Initialize HX711
+============================================================
+*/
 
 bool HX711Sensor::begin()
 {
-    scale.begin(_doutPin, _sckPin);
+    _scale.begin(_doutPin, _sckPin);
 
-    if (!scale.is_ready())
-    {
-        Serial.println("[HX711] ERROR : Module not detected.");
-        return false;
-    }
+    _scale.set_scale(_calibrationFactor);
 
-    Serial.println("[HX711] Module detected.");
+    delay(500);
 
-    scale.set_scale(_calibrationFactor);
+    tare();
 
-    Serial.println("[HX711] Taring...");
-
-    scale.tare(20);
-
-    Serial.println("[HX711] Calibration Complete.");
-
-    return true;
+    return _scale.wait_ready_timeout(1000);
 }
+
+/*
+============================================================
+Tare Scale
+============================================================
+*/
 
 void HX711Sensor::tare()
 {
-    if (scale.is_ready())
+    if (_scale.wait_ready_timeout(1000))
     {
-        scale.tare(20);
-
-        Serial.println("[HX711] Tare Complete.");
+        _scale.tare();
     }
 }
+
+/*
+============================================================
+Read Current Weight
+============================================================
+*/
+
+float HX711Sensor::getWeight()
+{
+    if (!_scale.wait_ready_timeout(500))
+    {
+        return 0.0f;
+    }
+
+    float weight = _scale.get_units(5);
+
+    if (weight < MIN_VALID_WEIGHT)
+    {
+        weight = 0.0f;
+    }
+
+    if (weight > MAX_VALID_WEIGHT)
+    {
+        weight = MAX_VALID_WEIGHT;
+    }
+
+    return weight;
+}
+
+/*
+============================================================
+Moving Average Filter
+============================================================
+*/
+
+float HX711Sensor::applyMovingAverage(float value)
+{
+    _samples[_sampleIndex] = value;
+
+    _sampleIndex++;
+
+    if (_sampleIndex >= FILTER_SIZE)
+    {
+        _sampleIndex = 0;
+        _bufferFilled = true;
+    }
+
+    uint8_t count = _bufferFilled ? FILTER_SIZE : _sampleIndex;
+
+    if (count == 0)
+    {
+        return value;
+    }
+
+    float sum = 0.0f;
+
+    for (uint8_t i = 0; i < count; i++)
+    {
+        sum += _samples[i];
+    }
+
+    return sum / count;
+}
+
+/*
+============================================================
+Filtered Weight
+============================================================
+*/
+
+float HX711Sensor::getFilteredWeight()
+{
+    return applyMovingAverage(getWeight());
+}
+
+/*
+============================================================
+Calibration
+============================================================
+*/
 
 void HX711Sensor::setCalibrationFactor(float factor)
 {
     _calibrationFactor = factor;
 
-    scale.set_scale(_calibrationFactor);
+    _scale.set_scale(_calibrationFactor);
 }
 
 float HX711Sensor::getCalibrationFactor() const
 {
     return _calibrationFactor;
-}
-
-bool HX711Sensor::sensorHealthy()
-{
-    return scale.is_ready();
-}
-
-float HX711Sensor::getWeight()
-{
-    if (!sensorHealthy())
-    {
-        Serial.println("[HX711] Sensor Offline.");
-
-        return -1.0f;
-    }
-
-    /*
-        Read average of 10 samples.
-        Removes electrical noise.
-    */
-
-    float weight = scale.get_units(10);
-
-    /*
-        Prevent tiny negative values caused
-        by sensor drift.
-    */
-
-    if (weight < 0)
-        weight = 0;
-
-    return weight;
 }

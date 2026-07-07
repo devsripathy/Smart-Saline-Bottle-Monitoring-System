@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+
+  api:
+    build:
+      context: ./backend
+    ports:
+      - "5000:8080"
+
+    depends_on:
+      - database
+
+  dashboard:
+    build:
+      context: ./dashboard
+
+    ports:
+      - "3000:80"
+
+    depends_on:
+      - api
+
+  database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "StrongPassword123!"
+
+    ports:
+      - "1433:1433"
+
+    volumes:
+      - db_data:/var/opt/mssql
+
+volumes:
+  db_data:

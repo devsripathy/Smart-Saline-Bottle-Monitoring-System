@@ -151,3 +151,106 @@ float HX711Sensor::getCalibrationFactor() const
 {
     return _calibrationFactor;
 }
+/*
+============================================================
+Sensor Health Check
+============================================================
+*/
+
+bool HX711Sensor::sensorHealthy()
+{
+    return _scale.wait_ready_timeout(500);
+}
+
+/*
+============================================================
+Constrain Percentage
+============================================================
+*/
+
+float HX711Sensor::constrainPercentage(float percent)
+{
+    if (percent < 0.0f)
+    {
+        return 0.0f;
+    }
+
+    if (percent > 100.0f)
+    {
+        return 100.0f;
+    }
+
+    return percent;
+}
+
+/*
+============================================================
+Calculate Saline Percentage
+
+Formula:
+
+          Current - Empty
+% = ----------------------------- × 100
+      Full - Empty
+
+============================================================
+*/
+
+float HX711Sensor::getPercentage()
+{
+    float weight = getFilteredWeight();
+
+    float percent =
+        ((weight - _emptyWeight) /
+        (_fullWeight - _emptyWeight)) * 100.0f;
+
+    return constrainPercentage(percent);
+}
+
+/*
+============================================================
+Bottle Presence Detection
+
+Bottle is considered present if measured
+weight exceeds the empty bottle threshold
+by a small tolerance.
+============================================================
+*/
+
+bool HX711Sensor::bottlePresent()
+{
+    float weight = getFilteredWeight();
+
+    return weight >= (_emptyWeight + 20.0f);
+}
+
+/*
+============================================================
+Bottle Empty Detection
+
+Returns true when saline percentage
+falls below the critical threshold.
+============================================================
+*/
+
+bool HX711Sensor::isBottleEmpty()
+{
+    return getPercentage() <= CRITICAL_LEVEL_PERCENT;
+}
+
+/*
+============================================================
+Low Saline Detection
+
+Returns true when saline percentage
+falls below the configured low level.
+============================================================
+*/
+
+bool HX711Sensor::isBottleLow()
+{
+    float percentage = getPercentage();
+
+    return (percentage <= LOW_LEVEL_PERCENT) &&
+           (percentage > CRITICAL_LEVEL_PERCENT);
+}

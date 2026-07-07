@@ -15,15 +15,12 @@ LoRaManager::LoRaManager(
     _rstPin = rstPin;
     _dio0Pin = dio0Pin;
 
-    _packetCounter = 0;
+    _sequenceNumber = 0;
 }
 
 bool LoRaManager::begin()
 {
-    LoRa.setPins(
-        _ssPin,
-        _rstPin,
-        _dio0Pin);
+    LoRa.setPins(_ssPin, _rstPin, _dio0Pin);
 
     if (!LoRa.begin(_frequency))
     {
@@ -41,22 +38,39 @@ String LoRaManager::createPacket(
     float percentage,
     uint32_t dripCount,
     float flowRate,
-    const String& status)
+    const char* status)
 {
-    _packetCounter++;
+    _sequenceNumber++;
 
-    String packet = "{";
+    String json;
 
-    packet += "\"id\":\"" + deviceId + "\",";
-    packet += "\"seq\":" + String(_packetCounter) + ",";
-    packet += "\"weight\":" + String(weight, 2) + ",";
-    packet += "\"percent\":" + String(percentage, 1) + ",";
-    packet += "\"drips\":" + String(dripCount) + ",";
-    packet += "\"flow\":" + String(flowRate, 1) + ",";
-    packet += "\"status\":\"" + status + "\"";
-    packet += "}";
+    json.reserve(200);
 
-    return packet;
+    json += "{";
+    json += "\"device\":\"";
+    json += deviceId;
+    json += "\",";
+    json += "\"seq\":";
+    json += String(_sequenceNumber);
+    json += ",";
+    json += "\"weight\":";
+    json += String(weight,2);
+    json += ",";
+    json += "\"percentage\":";
+    json += String(percentage,1);
+    json += ",";
+    json += "\"drips\":";
+    json += String(dripCount);
+    json += ",";
+    json += "\"flowRate\":";
+    json += String(flowRate,1);
+    json += ",";
+    json += "\"status\":\"";
+    json += status;
+    json += "\"";
+    json += "}";
+
+    return json;
 }
 
 bool LoRaManager::sendPacket(
@@ -65,20 +79,19 @@ bool LoRaManager::sendPacket(
     float percentage,
     uint32_t dripCount,
     float flowRate,
-    const String& status)
+    const char* status)
 {
-    String packet =
-        createPacket(
-            deviceId,
-            weight,
-            percentage,
-            dripCount,
-            flowRate,
-            status);
+    String packet = createPacket(
+        deviceId,
+        weight,
+        percentage,
+        dripCount,
+        flowRate,
+        status);
 
     const uint8_t MAX_RETRIES = 3;
 
-    for (uint8_t retry = 0; retry < MAX_RETRIES; retry++)
+    for(uint8_t i=0;i<MAX_RETRIES;i++)
     {
         LoRa.beginPacket();
 
@@ -86,7 +99,7 @@ bool LoRaManager::sendPacket(
 
         LoRa.endPacket();
 
-        if (waitForAck(1000))
+        if(waitForAck(1000))
         {
             return true;
         }
@@ -102,34 +115,34 @@ bool LoRaManager::available()
 
 String LoRaManager::receivePacket()
 {
-    String incoming;
+    String message;
 
-    while (LoRa.available())
+    while(LoRa.available())
     {
-        incoming += (char)LoRa.read();
+        message += (char)LoRa.read();
     }
 
-    return incoming;
+    return message;
 }
 
 bool LoRaManager::waitForAck(uint32_t timeout)
 {
     unsigned long start = millis();
 
-    while (millis() - start < timeout)
+    while(millis() - start < timeout)
     {
         int packetSize = LoRa.parsePacket();
 
-        if (packetSize)
+        if(packetSize)
         {
             String ack;
 
-            while (LoRa.available())
+            while(LoRa.available())
             {
                 ack += (char)LoRa.read();
             }
 
-            if (ack == "ACK")
+            if(ack == "ACK")
             {
                 return true;
             }

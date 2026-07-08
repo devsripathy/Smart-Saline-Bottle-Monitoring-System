@@ -24,13 +24,13 @@ IRSensor irSensor(IR_SENSOR_PIN);
 
 SensorFusion fusion;
 
-AlertManager alerts(STATUS_LED);
+AlertManager alerts(STATUS_LED_PIN);
 
 LoRaManager lora(
     LORA_FREQUENCY,
-    LORA_SS,
-    LORA_RST,
-    LORA_DIO0);
+    LORA_SS_PIN,
+    LORA_RST_PIN,
+    LORA_DIO0_PIN);
 
 /*
 ============================================================
@@ -240,7 +240,7 @@ void loop()
 {
     unsigned long currentMillis = millis();
 
-    if (currentMillis - lastSensorRead >= SENSOR_INTERVAL)
+    if (currentMillis - lastSensorRead >= SENSOR_READ_INTERVAL)
     {
         lastSensorRead = currentMillis;
 
@@ -251,7 +251,7 @@ void loop()
         printDebug();
     }
 
-    if (currentMillis - lastLoRaSend >= LORA_INTERVAL)
+    if (currentMillis - lastLoRaSend >= LORA_SEND_INTERVAL)
     {
         lastLoRaSend = currentMillis;
 

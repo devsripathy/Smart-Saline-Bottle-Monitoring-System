@@ -41,8 +41,7 @@ private:
     uint32_t _windowCount;
 
     static constexpr uint16_t DEBOUNCE_MS = 40;
-    static constexpr uint32_t FLOW_WINDOW_MS = 60000;
-    static constexpr uint32_t NO_DRIP_TIMEOUT_MS = 10000;
+    
 };
 
 #endif
